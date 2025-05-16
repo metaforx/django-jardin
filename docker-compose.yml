@@ -2,10 +2,10 @@ services:
   web:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: app/Dockerfile
     command: python manage.py runserver 0.0.0.0:8000
     volumes:
-      - ./app/:/usr/src/django_jardin/
+      - ./app/:/usr/src/app/
     ports:
       - "8000:8000"
     env_file:

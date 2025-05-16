@@ -2,7 +2,7 @@ services:
   web:
     build:
       context: .
-      dockerfile: Prod.Dockerfile
+      dockerfile: app/Prod.Dockerfile
     command: gunicorn django_jardin.wsgi:application --bind 0.0.0.0:8000
     expose:
       - 8000

@@ -2,9 +2,8 @@
 FROM python:3.12.10-slim-bookworm
 
 # set work directory
-ARG APP_HOME=/usr/src/django_jardin
+ARG APP_HOME=/usr/src/app
 WORKDIR ${APP_HOME}
-
 
 # set environment variables
 ENV PYTHONDONTWRITEBYTECODE 1
@@ -18,15 +17,13 @@ COPY pyproject.toml poetry.lock* ./
 RUN poetry install --no-interaction --no-ansi --no-root
 
 # copy entrypoint.sh
-COPY ./entrypoint.sh .
+COPY app/entrypoint.sh .
 RUN sed -i 's/\r$//g' ${APP_HOME}/entrypoint.sh
 RUN chmod +x ${APP_HOME}/entrypoint.sh
 RUN cp ${APP_HOME}/entrypoint.sh /entrypoint.sh
 
-
 # copy project
-COPY ./app .
+COPY app/ .
 
 # run entrypoint.sh
 ENTRYPOINT ["/entrypoint.sh"]
-
