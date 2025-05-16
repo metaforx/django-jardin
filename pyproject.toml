@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "django-jardin"
+version = "0.1.0"
+description = "Data Management for \"Le Jardin\""
+authors = ["Marc Widmer <marc@pbi.io>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+django = "^5.2.1"
+psycopg2-binary = "^2.9.10"
+gunicorn = "^23.0.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
