@@ -41,7 +41,9 @@ RUN addgroup --system app && adduser --system --group app
 ENV HOME=/home/app
 ENV APP_HOME=/home/app/web
 RUN mkdir $APP_HOME
-RUN mkdir $APP_HOME/staticfiles
+RUN mkdir -p $APP_HOME/staticfiles
+RUN chown app:app $APP_HOME/staticfiles
+RUN chmod 750 $APP_HOME/staticfiles
 WORKDIR $APP_HOME
 
 # install dependencies
