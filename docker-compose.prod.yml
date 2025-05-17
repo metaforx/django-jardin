@@ -1,4 +1,13 @@
 services:
+  init-static:
+    image: busybox
+    volumes:
+      - static_volume:/staticfiles
+    command: >
+      sh -c "mkdir -p /staticfiles && 
+             chmod -R 755 /staticfiles && 
+             echo 'Static files directory prepared'"
+
   web:
     build:
       context: .
@@ -14,6 +23,9 @@ services:
         - DATABASE=postgres
     depends_on:
       - db
+      - init-static
+
+
   db:
     image: postgres:15
     volumes:
