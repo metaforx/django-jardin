@@ -1,13 +1,4 @@
 services:
-  init-static:
-    image: busybox
-    volumes:
-      - static_volume:/staticfiles
-    command: >
-      sh -c "mkdir -p /staticfiles && 
-             chmod -R 755 /staticfiles && 
-             echo 'Static files directory prepared'"
-
   web:
     build:
       context: .
@@ -20,11 +11,9 @@ services:
     env_file:
       - .env.prod
     environment:
-        - DATABASE=postgres
+      - DATABASE=postgres
     depends_on:
       - db
-      - init-static
-
 
   db:
     image: postgres:15
@@ -32,10 +21,11 @@ services:
       - postgres_data:/var/lib/postgresql/data/
     env_file:
       - .env.prod
+
   nginx:
     build: ./nginx
     volumes:
-      - static_volume:/home/app/web/staticfiles
+      - static_volume:/home/app/web/staticfiles:ro
     ports:
       - "1337:80"
     depends_on:
