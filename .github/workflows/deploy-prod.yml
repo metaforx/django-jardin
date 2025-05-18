@@ -32,77 +32,57 @@ jobs:
         run: |
           docker-compose -f docker-compose.prod.yml run --rm web python manage.py test
 
-      - name: Save Docker images
-        if: success()
-        run: |
-          mkdir -p images
-          docker save $(docker images -q) -o images/docker-images.tar
+#      - name: Save Docker images
+#        if: success()
+#        run: |
+#          mkdir -p images
+#          docker save $(docker images -q) -o images/docker-images.tar
+#
+#      - name: Upload Docker images as artifact
+#        uses: actions/upload-artifact@v4
+#        with:
+#          name: docker-images
+#          path: images/docker-images.tar
+#          retention-days: 1
 
-      - name: Upload Docker images as artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: docker-images
-          path: images/docker-images.tar
-          retention-days: 1
 
   deploy:
     needs: build-and-test
     runs-on: ubuntu-latest
     environment: production
+    env:
+      DEPLOY_DIR: /opt/django-jardin
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Download Docker images
-        uses: actions/download-artifact@v4
+      - name: Deploy to production
+        uses: appleboy/ssh-action@master
         with:
-          name: docker-images
-          path: images
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          envs: DEPLOY_DIR
+          script: |
+            # Ensure deployment directory exists
+            mkdir -p $DEPLOY_DIR
 
-      - name: Set up SSH
-        uses: webfactory/ssh-agent@v0.7.0
-        with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+            # Download latest code from the current repository
+            curl -L https://github.com/${{ github.repository }}/archive/refs/heads/main.zip -o /tmp/deployment.zip
 
-      - name: Add host key to known hosts
-        run: |
-          mkdir -p ~/.ssh
-          ssh-keyscan -H ${{ secrets.SERVER_IP }} >> ~/.ssh/known_hosts
+            # Extract it (overwriting previous files)
+            unzip -o /tmp/deployment.zip -d /tmp/
+            mv /tmp/${GITHUB_REPOSITORY#*/}-main/* $DEPLOY_DIR/
+            rm /tmp/deployment.zip
 
-      - name: Copy and deploy
-        env:
-          SERVER_IP: ${{ secrets.SERVER_IP }}
-          SERVER_USER: ${{ secrets.SERVER_USER }}
-        run: |
-          set -euo pipefail    # propagate the *real* failing line
-          
-          echo "Transferring Docker artifacts…"
-          rsync -avz -e "ssh -o StrictHostKeyChecking=no" images/docker-images.tar \
-                $SERVER_USER@$SERVER_IP:/tmp/
-          rsync -avz -e "ssh -o StrictHostKeyChecking=no" docker-compose.prod.yml \
-                $SERVER_USER@$SERVER_IP:/tmp/
-          
-          echo "Executing remote deployment…"
-          ssh -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_IP /bin/bash <<'REMOTE'
-            set -euo pipefail
-          
-            # Stop existing stack (ignore error if first deploy)
-            docker compose -f /opt/django-jardin/docker-compose.prod.yml down --remove-orphans || true
-          
-            # Load new images
-            docker load -i /tmp/docker-images.tar
-          
-            # Prepare directory
-            mkdir -p /opt/django-jardin
-            mv /tmp/docker-compose.prod.yml /opt/django-jardin/
-          
-            # Write .env
-            cat > /opt/django-jardin/.env.prod <<'EOF'
-            ${{ secrets.ENV_PROD_FILE }}
-            EOF
+            # Set up environment variables from secret
+            echo '${{ secrets.ENV_PROD_FILE }}' > $DEPLOY_DIR/.env.prod
+
+            # Build and deploy
+            cd $DEPLOY_DIR
             
-            # Start containers
-            docker compose -f /opt/django-jardin/docker-compose.prod.yml up -d
+            # Shut down existing containers and remove volumes before deployment
+            docker compose -f docker-compose.prod.yml down -v --remove-orphans
             
-            rm -f /tmp/docker-images.tar
-            REMOTE
+            # Build and start containers with the updated code
+            docker compose -f docker-compose.prod.yml build
+            docker compose -f docker-compose.prod.yml up -d
+
+
