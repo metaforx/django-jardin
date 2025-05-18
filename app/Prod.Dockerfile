@@ -35,7 +35,7 @@ FROM python:3.12.10-slim-bookworm
 RUN mkdir -p /home/app
 
 # create the app user
-RUN addgroup --system app && adduser --system --group app
+RUN addgroup --system --gid 1000 app && adduser --system --uid 1000 --gid 1000 app
 
 # create the appropriate directories
 ENV HOME=/home/app
