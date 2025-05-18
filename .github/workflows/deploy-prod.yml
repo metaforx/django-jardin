@@ -74,42 +74,39 @@ jobs:
           SERVER_IP: ${{ secrets.SERVER_IP }}
           SERVER_USER: ${{ secrets.SERVER_USER }}
         run: |
-          # Increase SSH timeout settings
-          mkdir -p ~/.ssh
-          echo "ServerAliveInterval 60" >> ~/.ssh/config
-          echo "ServerAliveCountMax 10" >> ~/.ssh/config
-          
-          # Split the large file transfer
-          echo "Copying Docker images to server..."
-          scp -o ConnectTimeout=60 -o ConnectionAttempts=5 images/docker-images.tar $SERVER_USER@$SERVER_IP:/tmp/
-          echo "Image transfer complete"
+          # Copy Docker images to server with progress
+          echo "Transferring Docker images (this may take several minutes)..."
+          rsync --progress -avz images/docker-images.tar $SERVER_USER@$SERVER_IP:/tmp/
           
           # Copy Docker Compose file
-          echo "Copying Docker Compose files..."
-          scp -o ConnectTimeout=60 -o ConnectionAttempts=5 docker-compose.prod.yml $SERVER_USER@$SERVER_IP:/tmp/
-          echo "Compose file transfer complete"
+          echo "Transferring Docker Compose file..."
+          rsync --progress -avz docker-compose.prod.yml $SERVER_USER@$SERVER_IP:/tmp/
           
-          # Run deployment in smaller steps
-          echo "Stopping existing containers..."
-          ssh -o ConnectTimeout=60 $SERVER_USER@$SERVER_IP "docker-compose -f /opt/django-jardin/docker-compose.prod.yml down --remove-orphans || true"
+   
+          # Execute deployment on server
+          echo "Executing deployment on server..."
+          ssh $SERVER_USER@$SERVER_IP "
+            # Stop running containers
+            docker-compose -f /opt/django-jardin/docker-compose.prod.yml down --remove-orphans || true
           
-          echo "Loading Docker images..."
-          ssh -o ConnectTimeout=60 $SERVER_USER@$SERVER_IP "docker load -i /tmp/docker-images.tar"
+            # Load Docker images
+            docker load -i /tmp/docker-images.tar
           
-          echo "Setting up deployment directory..."
-          ssh -o ConnectTimeout=60 $SERVER_USER@$SERVER_IP "mkdir -p /opt/django-jardin && cp /tmp/docker-compose.prod.yml /opt/django-jardin/"
+            # Prepare directory
+            mkdir -p /opt/django-jardin
           
-          echo "Creating environment file..."
-          ssh -o ConnectTimeout=60 $SERVER_USER@$SERVER_IP "cat > /opt/django-jardin/.env.prod" << 'ENDSSH'
-          ${{ secrets.ENV_PROD_FILE }}
-          ENDSSH
+            # Move compose file
+            cp /tmp/docker-compose.prod.yml /opt/django-jardin/
           
-          echo "Starting containers..."
-          ssh -o ConnectTimeout=60 $SERVER_USER@$SERVER_IP "cd /opt/django-jardin && docker-compose -f docker-compose.prod.yml up -d"
+            # Create env file
+            cd /opt/django-jardin
+            cat << 'EOF' > .env.prod
+            ${{ secrets.ENV_PROD_FILE }}
+            EOF
           
-          echo "Cleaning up..."
-          ssh -o ConnectTimeout=60 $SERVER_USER@$SERVER_IP "rm /tmp/docker-images.tar"
+            # Start containers (no need to build)
+            docker-compose -f docker-compose.prod.yml up -d
           
-          echo "Deployment completed successfully"
-
+            # Cleanup
+            rm /tmp/docker-images.tar
           "
