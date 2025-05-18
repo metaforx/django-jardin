@@ -26,25 +26,11 @@ jobs:
           version: v2.23.3
 
       - name: Build containers
-        run: docker-compose -f docker-compose.prod.yml build
+        run: docker compose -f docker-compose.prod.yml build
 
       - name: Run tests
         run: |
-          docker-compose -f docker-compose.prod.yml run --rm web python manage.py test
-
-#      - name: Save Docker images
-#        if: success()
-#        run: |
-#          mkdir -p images
-#          docker save $(docker images -q) -o images/docker-images.tar
-#
-#      - name: Upload Docker images as artifact
-#        uses: actions/upload-artifact@v4
-#        with:
-#          name: docker-images
-#          path: images/docker-images.tar
-#          retention-days: 1
-
+          docker compose -f docker-compose.prod.yml run --rm web python manage.py test
 
   deploy:
     needs: build-and-test
