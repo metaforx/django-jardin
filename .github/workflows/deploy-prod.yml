@@ -45,30 +45,41 @@ jobs:
           host: ${{ secrets.SERVER_IP }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          envs: DEPLOY_DIR
+          envs: DEPLOY_DIR,GITHUB_REPOSITORY
           script: |
             # Ensure deployment directory exists
             mkdir -p $DEPLOY_DIR
 
+            # Install unzip if it's not available
+            if ! command -v unzip &> /dev/null; then
+              apt-get update && apt-get install -y unzip
+            fi
+
+            # Extract repository name for later use
+            REPO_NAME=$(echo ${GITHUB_REPOSITORY} | cut -d'/' -f2)
+
             # Download latest code from the current repository
-            curl -L https://github.com/${{ github.repository }}/archive/refs/heads/main.zip -o /tmp/deployment.zip
+            curl -L https://github.com/$GITHUB_REPOSITORY/archive/refs/heads/main.zip -o /tmp/deployment.zip
 
             # Extract it (overwriting previous files)
             unzip -o /tmp/deployment.zip -d /tmp/
-            mv /tmp/${GITHUB_REPOSITORY#*/}-main/* $DEPLOY_DIR/
-            rm /tmp/deployment.zip
+            mv /tmp/$REPO_NAME-main/* $DEPLOY_DIR/
+
+            # Clean up temporary files
+            rm -rf /tmp/deployment.zip /tmp/$REPO_NAME-main
 
             # Set up environment variables from secret
             echo '${{ secrets.ENV_PROD_FILE }}' > $DEPLOY_DIR/.env.prod
 
             # Build and deploy
             cd $DEPLOY_DIR
-            
-            # Shut down existing containers and remove volumes before deployment
+
+            # Shut down existing containers and remove volumes and orphaned containers before deployment
             docker compose -f docker-compose.prod.yml down -v --remove-orphans
-            
+
             # Build and start containers with the updated code
             docker compose -f docker-compose.prod.yml build
             docker compose -f docker-compose.prod.yml up -d
+  
 
 
