@@ -1,0 +1,102 @@
+name: Build, Test and Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Create env file for build
+        run: |
+          cat << 'EOF' > .env.prod
+          ${{ secrets.ENV_PROD_FILE }}
+          EOF
+
+      - name: Build containers
+        run: docker-compose -f docker-compose.prod.yml build
+
+      - name: Run tests
+        run: |
+          docker-compose -f docker-compose.prod.yml run --rm web python manage.py test
+
+      - name: Save Docker images
+        if: success()
+        run: |
+          mkdir -p images
+          docker save $(docker images -q) -o images/docker-images.tar
+
+      - name: Upload Docker images as artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: docker-images
+          path: images/docker-images.tar
+          retention-days: 1
+
+  deploy:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Download Docker images
+        uses: actions/download-artifact@v3
+        with:
+          name: docker-images
+          path: images
+
+      - name: Set up SSH
+        uses: webfactory/ssh-agent@v0.7.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Add host key to known hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.SERVER_IP }} >> ~/.ssh/known_hosts
+
+      - name: Copy and deploy
+        env:
+          SERVER_IP: ${{ secrets.SERVER_IP }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+        run: |
+          # Copy Docker images to server
+          scp images/docker-images.tar $SERVER_USER@$SERVER_IP:/tmp/
+          
+          # Copy code and Docker Compose files
+          scp -r docker-compose.prod.yml $SERVER_USER@$SERVER_IP:/tmp/
+          
+          # Execute deployment on server
+          ssh $SERVER_USER@$SERVER_IP "
+            # Stop running containers
+            docker-compose -f /opt/django-jardin/docker-compose.prod.yml down --remove-orphans || true
+          
+            # Load Docker images
+            docker load -i /tmp/docker-images.tar
+          
+            # Prepare directory
+            mkdir -p /opt/django-jardin
+          
+            # Move compose file
+            cp /tmp/docker-compose.prod.yml /opt/django-jardin/
+          
+            # Create env file
+            cd /opt/django-jardin
+            cat << 'EOF' > .env.prod
+            ${{ secrets.ENV_PROD_FILE }}
+            EOF
+          
+            # Start containers (no need to build)
+            docker-compose -f docker-compose.prod.yml up -d
+          
+            # Cleanup
+            rm /tmp/docker-images.tar
+          "
