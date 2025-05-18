@@ -64,44 +64,45 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
+      - name: Add host key to known hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.SERVER_IP }} >> ~/.ssh/known_hosts
+
       - name: Copy and deploy
         env:
           SERVER_IP: ${{ secrets.SERVER_IP }}
           SERVER_USER: ${{ secrets.SERVER_USER }}
         run: |
-          # Copy Docker images to server with progress
-          echo "Transferring Docker images (this may take several minutes)..."
-          rsync --progress -avz images/docker-images.tar $SERVER_USER@$SERVER_IP:/tmp/
+          set -euo pipefail    # propagate the *real* failing line
           
-          # Copy Docker Compose file
-          echo "Transferring Docker Compose file..."
-          rsync --progress -avz docker-compose.prod.yml $SERVER_USER@$SERVER_IP:/tmp/
+          echo "Transferring Docker artifacts…"
+          rsync -avz -e "ssh -o StrictHostKeyChecking=no" images/docker-images.tar \
+                $SERVER_USER@$SERVER_IP:/tmp/
+          rsync -avz -e "ssh -o StrictHostKeyChecking=no" docker-compose.prod.yml \
+                $SERVER_USER@$SERVER_IP:/tmp/
           
-   
-          # Execute deployment on server
-          echo "Executing deployment on server..."
-          ssh $SERVER_USER@$SERVER_IP "
-            # Stop running containers
-            docker-compose -f /opt/django-jardin/docker-compose.prod.yml down --remove-orphans || true
+          echo "Executing remote deployment…"
+          ssh -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_IP /bin/bash <<'REMOTE'
+            set -euo pipefail
           
-            # Load Docker images
+            # Stop existing stack (ignore error if first deploy)
+            docker compose -f /opt/django-jardin/docker-compose.prod.yml down --remove-orphans || true
+          
+            # Load new images
             docker load -i /tmp/docker-images.tar
           
             # Prepare directory
             mkdir -p /opt/django-jardin
+            mv /tmp/docker-compose.prod.yml /opt/django-jardin/
           
-            # Move compose file
-            cp /tmp/docker-compose.prod.yml /opt/django-jardin/
-          
-            # Create env file
-            cd /opt/django-jardin
-            cat << 'EOF' > .env.prod
+            # Write .env
+            cat > /opt/django-jardin/.env.prod <<'EOF'
             ${{ secrets.ENV_PROD_FILE }}
             EOF
-          
-            # Start containers (no need to build)
-            docker-compose -f docker-compose.prod.yml up -d
-          
-            # Cleanup
-            rm /tmp/docker-images.tar
-          "
+            
+            # Start containers
+            docker compose -f /opt/django-jardin/docker-compose.prod.yml up -d
+            
+            rm -f /tmp/docker-images.tar
+            REMOTE
