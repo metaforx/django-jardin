@@ -81,8 +81,11 @@ jobs:
             cd $DEPLOY_DIR
             
             # Shut down existing containers and remove volumes and orphaned containers before deployment
-            docker compose -f docker-compose.prod.yml down -v --remove-orphans
-            
+            docker compose -f docker-compose.prod.yml down --remove-orphans
+
+            # Remove static volume
+            docker volume rm django-jardin_static_volume || true
+
             # Build and start containers with the updated code
             docker compose -f docker-compose.prod.yml build
             docker compose -f docker-compose.prod.yml up -d
