@@ -50,9 +50,13 @@ jobs:
             # Ensure deployment directory exists
             mkdir -p $DEPLOY_DIR
 
-            # Install unzip if it's not available
+            # Install required tools if not available
             if ! command -v unzip &> /dev/null; then
               apt-get update && apt-get install -y unzip
+            fi
+            
+            if ! command -v rsync &> /dev/null; then
+              apt-get update && apt-get install -y rsync
             fi
 
             # Extract repository name for later use
@@ -63,8 +67,10 @@ jobs:
 
             # Extract it (overwriting previous files)
             unzip -o /tmp/deployment.zip -d /tmp/
-            mv /tmp/$REPO_NAME-main/* $DEPLOY_DIR/
-
+            
+            # Use rsync to copy files, preserving directory structure and overwriting existing files
+            rsync -av --delete /tmp/$REPO_NAME-main/ $DEPLOY_DIR/
+            
             # Clean up temporary files
             rm -rf /tmp/deployment.zip /tmp/$REPO_NAME-main
 
@@ -73,13 +79,14 @@ jobs:
 
             # Build and deploy
             cd $DEPLOY_DIR
-
+            
             # Shut down existing containers and remove volumes and orphaned containers before deployment
             docker compose -f docker-compose.prod.yml down -v --remove-orphans
-
+            
             # Build and start containers with the updated code
             docker compose -f docker-compose.prod.yml build
             docker compose -f docker-compose.prod.yml up -d
+
   
 
 
