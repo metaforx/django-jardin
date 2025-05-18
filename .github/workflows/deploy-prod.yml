@@ -19,6 +19,12 @@ jobs:
           ${{ secrets.ENV_PROD_FILE }}
           EOF
 
+      # Add this step to set up Docker Compose
+      - name: Set up Docker Compose
+        uses: ndeloof/install-compose-action@v0.0.1
+        with:
+          version: v2.23.3
+
       - name: Build containers
         run: docker-compose -f docker-compose.prod.yml build
 
