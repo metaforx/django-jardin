@@ -10,6 +10,7 @@ python = "^3.12"
 django = "^5.2.1"
 psycopg2-binary = "^2.9.10"
 gunicorn = "^23.0.0"
+django-shinobi = "^1.4.0a0"
 
 
 [build-system]
