@@ -14,6 +14,7 @@ services:
       - DATABASE=postgres
     depends_on:
       - db
+      - signal
 
   db:
     image: postgres:15
@@ -33,7 +34,15 @@ services:
 
     depends_on:
       - web
-
+  signal:
+    image: bbernhard/signal-cli-rest-api:latest
+    volumes:
+      - signal_data:/home/.local/share/signal-cli
+    ports:
+      - "8080:8080" # REST API port
+    environment:
+      - MODE=normal
 volumes:
   postgres_data:
   static_volume:
+  signal_data:
