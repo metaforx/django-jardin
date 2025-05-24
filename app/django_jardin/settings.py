@@ -131,6 +131,7 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 SIGNAL_PHONE_NUMBER = os.environ.get('SIGNAL_PHONE_NUMBER', '+1234567890')
 SIGNAL_RECEIVER_GROUP = os.environ.get('SIGNAL_RECEIVER_GROUP', '1234567890')
+SIGNAL_API_BASE_URL = os.environ.get('SIGNAL_API_BASE_URL', 'http://signal:8080')
 
 SESSION_ENGINE = "django.contrib.sessions.backends.cache"
 if DEBUG:

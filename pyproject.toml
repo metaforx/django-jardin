@@ -12,6 +12,7 @@ psycopg2-binary = "^2.9.10"
 gunicorn = "^23.0.0"
 django-shinobi = "^1.4.0a0"
 ninja-api-key = "^1.0.2"
+requests = "^2.32.3"
 
 
 [build-system]
