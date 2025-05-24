@@ -1,7 +1,10 @@
 # your_app/signals.py
-from django.dispatch import Signal, receiver
-from utils import SignalMessenger
+import sys
+
 from django.conf import settings
+from django.dispatch import Signal, receiver
+from .utils import SignalMessenger
+
 
 sensor_data_received = Signal()
 
@@ -14,12 +17,14 @@ def send_signal_notification(sender, sensor_data, **kwargs):
     message = (
         f"🔔 New Sensor Data Alert!\n\n"
         f"Sensor: {sensor_data.sensor_name}\n"
-        f"Value: {sensor_data.value} {sensor_data.unit}\n"
+        f"ID: {sensor_data.sensor_id}\n"
+        f"Value: {sensor_data.value}\n"
+        f"Type: {sensor_data.sensor_type}\n"
         f"Timestamp: {sensor_data.created_at.strftime('%Y-%m-%d %H:%M:%S')}"
     )
 
-    # Send to the single recipient
-    recipient = settings.SIGNAL_RECIPIENT
-    success, output = messenger.send_message(recipient, message)
-
+    # Send it to a signal group
+    group_id = settings.SIGNAL_RECEIVER_GROUP
+    success, output = messenger.send_message(group_id, message)
+    print(message, success, output)
     return success

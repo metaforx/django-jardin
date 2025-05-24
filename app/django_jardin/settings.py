@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "ninja",
+    "ninja_apikey",
     "jardin_data",
 ]
 
@@ -129,3 +130,4 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 SIGNAL_PHONE_NUMBER = os.environ.get('SIGNAL_PHONE_NUMBER', '+1234567890')
+SIGNAL_RECEIVER_GROUP = os.environ.get('SIGNAL_RECEIVER_GROUP', '1234567890')

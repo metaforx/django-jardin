@@ -35,3 +35,29 @@ class SignalMessenger:
         except subprocess.CalledProcessError as e:
             logger.error(f"Failed to send Signal message: {e.stderr}")
             return False, e.stderr
+
+
+    def send_group_message(self, group_id, message):
+        """Send a Signal message to a group"""
+        try:
+            cmd = [
+                "signal-cli",
+                "-u", self.phone_number,
+                "send",
+                "-g", group_id,
+                "-m", message
+            ]
+
+            result = subprocess.run(
+                cmd,
+                check=True,
+                text=True,
+                capture_output=True
+            )
+
+            logger.info(f"Sent Signal message to group {group_id}: {message[:50]}...")
+            return True, result.stdout
+
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Failed to send Signal group message: {e.stderr}")
+            return False, e.stderr
