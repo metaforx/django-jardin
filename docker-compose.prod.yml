@@ -42,7 +42,7 @@ services:
       - "8080:8080" # REST API port
     environment:
       - MODE=normal
-      - AUTO_RECEIVE_SCHEDULE=0 22
+      - AUTO_RECEIVE_SCHEDULE=0 22 * * *
 volumes:
   postgres_data:
   static_volume:
