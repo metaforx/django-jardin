@@ -1,4 +1,5 @@
-# utils/signal_messenger.py
+from typing import Tuple, Union, Literal
+
 import logging
 
 import requests
@@ -13,7 +14,12 @@ class SignalMessenger:
         self.phone_number = settings.SIGNAL_PHONE_NUMBER
         self.api_base_url = settings.SIGNAL_API_BASE_URL
 
-    def send_message(self, recipient, message, text_mode="normal"):
+    def send_message(
+        self,
+        recipient: str,
+        message: str,
+        text_mode: Literal["normal", "urgent", "preview"] = "normal",
+    ) -> Tuple[bool, str]:
         """
         Send a Signal message to a recipient using the REST API
 
