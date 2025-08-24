@@ -7,7 +7,10 @@ from .models import SensorData
 @register(SensorData)
 class SensorDataAdmin(admin.ModelAdmin):
     list_display = (
-        'id',
+        'device_id',
+        'sensor_id',
+        'sensor_name',
+        'sensor_type',
         'value',
         'created_at',
     )
