@@ -6,7 +6,8 @@ from django.contrib import admin
 from django.urls import path
 from django.views.generic import TemplateView
 from unfold.views import UnfoldModelAdminViewMixin
-from datetime import datetime, timedelta
+from datetime import timedelta
+from django.utils import timezone
 
 @register(SensorData)
 class SensorDataAdmin(ModelAdmin):
@@ -50,22 +51,35 @@ def dashboard_callback(request, context):
     # Get all unique sensor IDs
     sensor_ids = SensorData.objects.values_list('sensor_id', flat=True).distinct()
 
-    # Prepare color palette for different sensors
-    colors = [
-        'rgb(239, 68, 68)',    # red
-        'rgb(147, 51, 234)',   # purple
-        'rgb(234, 179, 8)',    # yellow
-        'rgb(34, 197, 94)',    # green
-        'rgb(59, 130, 246)',   # blue
-        'rgb(236, 72, 153)',   # pink
-        'rgb(249, 115, 22)',   # orange
-        'rgb(20, 184, 166)',   # teal
-    ]
+    # Color mapping based on sensor ID suffix
+    color_mapping = {
+        'red': 'rgb(239, 68, 68)',
+        'purple': 'rgb(147, 51, 234)',
+        'yellow': 'rgb(234, 179, 8)',
+        'green': 'rgb(34, 197, 94)',
+        'blue': 'rgb(59, 130, 246)',
+        'pink': 'rgb(236, 72, 153)',
+        'orange': 'rgb(249, 115, 22)',
+        'teal': 'rgb(20, 184, 166)',
+    }
 
     # Get data for each sensor
     datasets = []
     all_labels = []
     all_values = []
+
+    # Map sensor IDs to colors by extracting color from sensor ID
+    sensor_color_map = {}
+    for sensor_id in sensor_ids:
+        # Extract color from sensor ID (e.g., "27003b000547343232363230-0-yellow" -> "yellow")
+        color_name = None
+        for color_key in color_mapping.keys():
+            if sensor_id.endswith(f'-{color_key}'):
+                color_name = color_key
+                break
+
+        # Use the extracted color or default to red
+        sensor_color_map[sensor_id] = color_mapping.get(color_name, color_mapping['red'])
 
     for idx, sensor_id in enumerate(sensor_ids):
         # Get the latest 10 entries for this sensor
@@ -90,7 +104,7 @@ def dashboard_callback(request, context):
             all_labels = labels
 
         # Add dataset for this sensor
-        color = colors[idx % len(colors)]
+        color = sensor_color_map[sensor_id]
         datasets.append({
             'label': sensor_id,
             'data': values,
@@ -109,16 +123,11 @@ def dashboard_callback(request, context):
         max_temp = 30
 
     # Get lowest and highest temperatures from past 7 days
-    seven_days_ago = datetime.now() - timedelta(days=7)
+    seven_days_ago = timezone.now() - timedelta(days=7)
     recent_readings = SensorData.objects.filter(created_at__gte=seven_days_ago)
 
     lowest_temp_reading = recent_readings.order_by('value').first()
     highest_temp_reading = recent_readings.order_by('-value').first()
-
-    # Map sensor IDs to colors for consistency
-    sensor_color_map = {}
-    for idx, sensor_id in enumerate(sensor_ids):
-        sensor_color_map[sensor_id] = colors[idx % len(colors)]
 
     # Prepare lowest and highest temp data
     lowest_temp_data = None
@@ -131,7 +140,7 @@ def dashboard_callback(request, context):
             'sensor_name': lowest_temp_reading.sensor_name,
             'date': lowest_temp_reading.created_at.strftime('%Y-%m-%d'),
             'time': lowest_temp_reading.created_at.strftime('%H:%M'),
-            'color': sensor_color_map.get(lowest_temp_reading.sensor_id, colors[0])
+            'color': sensor_color_map.get(lowest_temp_reading.sensor_id, color_mapping['red'])
         }
 
     if highest_temp_reading:
@@ -141,13 +150,13 @@ def dashboard_callback(request, context):
             'sensor_name': highest_temp_reading.sensor_name,
             'date': highest_temp_reading.created_at.strftime('%Y-%m-%d'),
             'time': highest_temp_reading.created_at.strftime('%H:%M'),
-            'color': sensor_color_map.get(highest_temp_reading.sensor_id, colors[0])
+            'color': sensor_color_map.get(highest_temp_reading.sensor_id, color_mapping['red'])
         }
 
     # Calculate KPIs
     total_sensors = SensorData.objects.values('sensor_id').distinct().count()
     total_readings_7days = SensorData.objects.filter(
-        created_at__gte=datetime.now() - timedelta(days=7)
+        created_at__gte=timezone.now() - timedelta(days=7)
     ).count()
     total_devices = SensorData.objects.values('device_id').distinct().count()
 
