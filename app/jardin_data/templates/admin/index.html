@@ -69,6 +69,54 @@
             {% endcomponent %}
         {% endcomponent %}
 
+        <!-- Temperature Extremes -->
+        {% component "unfold/components/flex.html" with class="gap-8 mb-8 flex-col lg:flex-row" %}
+            {% if lowest_temp %}
+                {% component "unfold/components/card.html" with class="lg:w-1/2" %}
+                    {% component "unfold/components/text.html" with class="text-gray-500 dark:text-gray-400 mb-2" %}
+                        Lowest Temperature (Last 7 Days)
+                    {% endcomponent %}
+
+                    {% component "unfold/components/title.html" with class="font-medium text-3xl mb-4" %}
+                        {{ lowest_temp.value }}°C
+                    {% endcomponent %}
+
+                    {% component "unfold/components/flex.html" with class="gap-2 flex-col" %}
+                        {% component "unfold/components/text.html" with class="text-sm" %}
+                            <span style="color: {{ lowest_temp.color }}; font-weight: 600;">{{ lowest_temp.sensor_id }}</span> - {{ lowest_temp.sensor_name }}
+                        {% endcomponent %}
+
+                        {% component "unfold/components/text.html" with class="text-sm text-gray-500 dark:text-gray-400" %}
+                            {{ lowest_temp.date }} at {{ lowest_temp.time }}
+                        {% endcomponent %}
+                    {% endcomponent %}
+                {% endcomponent %}
+            {% endif %}
+
+            {% if highest_temp %}
+                {% component "unfold/components/card.html" with class="lg:w-1/2" %}
+                    {% component "unfold/components/text.html" with class="text-gray-500 dark:text-gray-400 mb-2" %}
+                        Highest Temperature (Last 7 Days)
+                    {% endcomponent %}
+
+                    {% component "unfold/components/title.html" with class="font-medium text-3xl mb-4" %}
+                        {{ highest_temp.value }}°C
+                    {% endcomponent %}
+
+                    {% component "unfold/components/flex.html" with class="gap-2 flex-col" %}
+                        {% component "unfold/components/text.html" with class="text-sm" %}
+                            <span style="color: {{ highest_temp.color }}; font-weight: 600;">{{ highest_temp.sensor_id }}</span> - {{ highest_temp.sensor_name }}
+                        {% endcomponent %}
+
+                        {% component "unfold/components/text.html" with class="text-sm text-gray-500 dark:text-gray-400" %}
+                            {{ highest_temp.date }} at {{ highest_temp.time }}
+                        {% endcomponent %}
+                    {% endcomponent %}
+                {% endcomponent %}
+            {% endif %}
+        {% endcomponent %}
+
+
         <!-- Table -->
         {% component "unfold/components/flex.html" with class="gap-8 mb-8 flex-col lg:flex-row" %}
             {% component "unfold/components/card.html" with title="Recent Sensor Readings" %}

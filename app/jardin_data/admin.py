@@ -108,6 +108,42 @@ def dashboard_callback(request, context):
         min_temp = 0
         max_temp = 30
 
+    # Get lowest and highest temperatures from past 7 days
+    seven_days_ago = datetime.now() - timedelta(days=7)
+    recent_readings = SensorData.objects.filter(created_at__gte=seven_days_ago)
+
+    lowest_temp_reading = recent_readings.order_by('value').first()
+    highest_temp_reading = recent_readings.order_by('-value').first()
+
+    # Map sensor IDs to colors for consistency
+    sensor_color_map = {}
+    for idx, sensor_id in enumerate(sensor_ids):
+        sensor_color_map[sensor_id] = colors[idx % len(colors)]
+
+    # Prepare lowest and highest temp data
+    lowest_temp_data = None
+    highest_temp_data = None
+
+    if lowest_temp_reading:
+        lowest_temp_data = {
+            'value': lowest_temp_reading.value,
+            'sensor_id': lowest_temp_reading.sensor_id,
+            'sensor_name': lowest_temp_reading.sensor_name,
+            'date': lowest_temp_reading.created_at.strftime('%Y-%m-%d'),
+            'time': lowest_temp_reading.created_at.strftime('%H:%M'),
+            'color': sensor_color_map.get(lowest_temp_reading.sensor_id, colors[0])
+        }
+
+    if highest_temp_reading:
+        highest_temp_data = {
+            'value': highest_temp_reading.value,
+            'sensor_id': highest_temp_reading.sensor_id,
+            'sensor_name': highest_temp_reading.sensor_name,
+            'date': highest_temp_reading.created_at.strftime('%Y-%m-%d'),
+            'time': highest_temp_reading.created_at.strftime('%H:%M'),
+            'color': sensor_color_map.get(highest_temp_reading.sensor_id, colors[0])
+        }
+
     # Calculate KPIs
     total_sensors = SensorData.objects.values('sensor_id').distinct().count()
     total_readings_7days = SensorData.objects.filter(
@@ -129,56 +165,59 @@ def dashboard_callback(request, context):
     # Send data to the dashboard
     context.update(
         {
-        "kpis": [
-            {
-                "title": "Total Active Sensors",
-                "metric": total_sensors,
-            },
-            {
-                "title": "Readings (Last 7 days)",
-                "metric": total_readings_7days,
-            },
-            {
-                "title": "Total Devices",
-                "metric": total_devices,
-            },
-        ],
+            "kpis": [
+                {
+                    "title": "Total Active Sensors",
+                    "metric": total_sensors,
+                },
+                {
+                    "title": "Readings (Last 7 days)",
+                    "metric": total_readings_7days,
+                },
+                {
+                    "title": "Total Devices",
+                    "metric": total_devices,
+                },
+            ],
 
-        "dauChartData": json.dumps({
-            'datasets': datasets,
-            'labels': all_labels
-        }),
+            "dauChartData": json.dumps({
+                'datasets': datasets,
+                'labels': all_labels
+            }),
 
-        "chartOptions": json.dumps({
-            'scales': {
-                'y': {
-                    'min': min_temp,
-                    'max': max_temp,
-                    'ticks': {
-                        'stepSize': 1
-                    },
-                    'title': {
-                        'display': True,
-                        'text': 'Temperature (°C)'
+            "chartOptions": json.dumps({
+                'scales': {
+                    'y': {
+                        'min': min_temp,
+                        'max': max_temp,
+                        'ticks': {
+                            'stepSize': 1
+                        },
+                        'title': {
+                            'display': True,
+                            'text': 'Temperature (°C)'
+                        }
+                    }
+                },
+                'plugins': {
+                    'legend': {
+                        'display': True
                     }
                 }
+            }),
+
+            "dpsChartData": json.dumps({
+                'datasets': datasets,
+                'labels': all_labels
+            }),
+
+            "lowest_temp": lowest_temp_data,
+            "highest_temp": highest_temp_data,
+
+            "table": {
+                "headers": ["Sensor Name", "Sensor ID", "Value", "Timestamp"],
+                "rows": table_rows,
             },
-            'plugins': {
-                'legend': {
-                    'display': True
-                }
-            }
-        }),
-
-        "dpsChartData": json.dumps({
-            'datasets': datasets,
-            'labels': all_labels
-        }),
-
-        "table": {
-            "headers": ["Sensor Name", "Sensor ID", "Value", "Timestamp"],
-            "rows": table_rows,
-        },
 
         }
     )
