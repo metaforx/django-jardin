@@ -10,4 +10,8 @@ class SensorData(models.Model):
     sensor_type = models.CharField(max_length=255)
 
     class Meta:
-        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['sensor_id', '-created_at']),
+            models.Index(fields=['created_at']),
+            models.Index(fields=['value']),
+        ]

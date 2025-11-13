@@ -48,9 +48,6 @@ def dashboard_callback(request, context):
     Callback to prepare custom variables for the index template which is used as a dashboard
     template. It can be overridden in the application by creating custom admin/index.html.
     """
-    # Get all unique sensor IDs
-    sensor_ids = SensorData.objects.values_list('sensor_id', flat=True).distinct()
-
     # Color mapping based on sensor ID suffix
     color_mapping = {
         'red': 'rgb(239, 68, 68)',
@@ -63,11 +60,9 @@ def dashboard_callback(request, context):
         'teal': 'rgb(20, 184, 166)',
     }
 
-    # Get data for each sensor
-    datasets = []
-    all_labels = []
-    all_values = []
-
+    # Get all unique sensor IDs in a single query
+    sensor_ids = list(SensorData.objects.values_list('sensor_id', flat=True).distinct())
+    
     # Map sensor IDs to colors by extracting color from sensor ID
     sensor_color_map = {}
     for sensor_id in sensor_ids:
@@ -77,20 +72,42 @@ def dashboard_callback(request, context):
             if sensor_id.endswith(f'-{color_key}'):
                 color_name = color_key
                 break
-
+        
         # Use the extracted color or default to red
         sensor_color_map[sensor_id] = color_mapping.get(color_name, color_mapping['red'])
 
-    for idx, sensor_id in enumerate(sensor_ids):
-        # Get the latest 10 entries for this sensor
-        sensor_data = (
-            SensorData.objects
-            .filter(sensor_id=sensor_id)
-            .order_by('-created_at')[:10]
-        )
+    # Fetch all recent sensor data in one query instead of looping
+    from django.db.models import Max
+    
+    # Get the latest 10 entries for each sensor in a single optimized query
+    all_sensor_data = (
+        SensorData.objects
+        .filter(sensor_id__in=sensor_ids)
+        .order_by('sensor_id', '-created_at')
+    )
+    
+    # Group data by sensor_id
+    sensor_data_grouped = {}
+    for data in all_sensor_data:
+        if data.sensor_id not in sensor_data_grouped:
+            sensor_data_grouped[data.sensor_id] = []
+        if len(sensor_data_grouped[data.sensor_id]) < 10:
+            sensor_data_grouped[data.sensor_id].append(data)
 
+    # Get data for each sensor
+    datasets = []
+    all_labels = []
+    all_values = []
+
+    for idx, sensor_id in enumerate(sensor_ids):
+        # Get the data for this sensor
+        sensor_data = sensor_data_grouped.get(sensor_id, [])
+        
         # Reverse to show oldest to newest
         sensor_data = list(reversed(sensor_data))
+
+        if not sensor_data:
+            continue
 
         # Extract values and timestamps
         values = [entry.value for entry in sensor_data]
@@ -122,17 +139,27 @@ def dashboard_callback(request, context):
         min_temp = 0
         max_temp = 30
 
-    # Get lowest and highest temperatures from past 7 days
+    # Get lowest and highest temperatures from past 7 days in a single query each
     seven_days_ago = timezone.now() - timedelta(days=7)
-    recent_readings = SensorData.objects.filter(created_at__gte=seven_days_ago)
-
-    lowest_temp_reading = recent_readings.order_by('value').first()
-    highest_temp_reading = recent_readings.order_by('-value').first()
-
+    
+    lowest_temp_reading = (
+        SensorData.objects
+        .filter(created_at__gte=seven_days_ago)
+        .order_by('value')
+        .first()
+    )
+    
+    highest_temp_reading = (
+        SensorData.objects
+        .filter(created_at__gte=seven_days_ago)
+        .order_by('-value')
+        .first()
+    )
+    
     # Prepare lowest and highest temp data
     lowest_temp_data = None
     highest_temp_data = None
-
+    
     if lowest_temp_reading:
         lowest_temp_data = {
             'value': lowest_temp_reading.value,
@@ -142,7 +169,7 @@ def dashboard_callback(request, context):
             'time': lowest_temp_reading.created_at.strftime('%H:%M'),
             'color': sensor_color_map.get(lowest_temp_reading.sensor_id, color_mapping['red'])
         }
-
+    
     if highest_temp_reading:
         highest_temp_data = {
             'value': highest_temp_reading.value,
@@ -153,15 +180,15 @@ def dashboard_callback(request, context):
             'color': sensor_color_map.get(highest_temp_reading.sensor_id, color_mapping['red'])
         }
 
-    # Calculate KPIs
-    total_sensors = SensorData.objects.values('sensor_id').distinct().count()
+    # Calculate KPIs with optimized queries
+    total_sensors = len(sensor_ids)
     total_readings_7days = SensorData.objects.filter(
-        created_at__gte=timezone.now() - timedelta(days=7)
+        created_at__gte=seven_days_ago
     ).count()
     total_devices = SensorData.objects.values('device_id').distinct().count()
 
     # Get recent data for table
-    recent_data = SensorData.objects.all()[:10]
+    recent_data = SensorData.objects.all().order_by('-created_at')[:10]
     table_rows = []
     for data in recent_data:
         table_rows.append([
@@ -174,59 +201,59 @@ def dashboard_callback(request, context):
     # Send data to the dashboard
     context.update(
         {
-            "kpis": [
-                {
-                    "title": "Total Active Sensors",
-                    "metric": total_sensors,
-                },
-                {
-                    "title": "Readings (Last 7 days)",
-                    "metric": total_readings_7days,
-                },
-                {
-                    "title": "Total Devices",
-                    "metric": total_devices,
-                },
-            ],
+        "kpis": [
+            {
+                "title": "Total Active Sensors",
+                "metric": total_sensors,
+            },
+            {
+                "title": "Readings (Last 7 days)",
+                "metric": total_readings_7days,
+            },
+            {
+                "title": "Total Devices",
+                "metric": total_devices,
+            },
+        ],
 
-            "dauChartData": json.dumps({
-                'datasets': datasets,
-                'labels': all_labels
-            }),
+        "dauChartData": json.dumps({
+            'datasets': datasets,
+            'labels': all_labels
+        }),
 
-            "chartOptions": json.dumps({
-                'scales': {
-                    'y': {
-                        'min': min_temp,
-                        'max': max_temp,
-                        'ticks': {
-                            'stepSize': 1
-                        },
-                        'title': {
-                            'display': True,
-                            'text': 'Temperature (°C)'
-                        }
-                    }
-                },
-                'plugins': {
-                    'legend': {
-                        'display': True
+        "chartOptions": json.dumps({
+            'scales': {
+                'y': {
+                    'min': min_temp,
+                    'max': max_temp,
+                    'ticks': {
+                        'stepSize': 1
+                    },
+                    'title': {
+                        'display': True,
+                        'text': 'Temperature (°C)'
                     }
                 }
-            }),
-
-            "dpsChartData": json.dumps({
-                'datasets': datasets,
-                'labels': all_labels
-            }),
-
-            "lowest_temp": lowest_temp_data,
-            "highest_temp": highest_temp_data,
-
-            "table": {
-                "headers": ["Sensor Name", "Sensor ID", "Value", "Timestamp"],
-                "rows": table_rows,
             },
+            'plugins': {
+                'legend': {
+                    'display': True
+                }
+            }
+        }),
+
+        "dpsChartData": json.dumps({
+            'datasets': datasets,
+            'labels': all_labels
+        }),
+
+        "lowest_temp": lowest_temp_data,
+        "highest_temp": highest_temp_data,
+
+        "table": {
+            "headers": ["Sensor Name", "Sensor ID", "Value", "Timestamp"],
+            "rows": table_rows,
+        },
 
         }
     )
