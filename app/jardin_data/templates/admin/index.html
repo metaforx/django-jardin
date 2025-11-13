@@ -46,18 +46,26 @@
                 {% endcomponent %}
 
                 <canvas id="sensorChart" style="max-height: 400px;"></canvas>
-                <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
                 <script>
                     const ctx = document.getElementById('sensorChart').getContext('2d');
                     const chartData = JSON.parse('{{ dauChartData|safe }}');
                     const chartOptions = JSON.parse('{{ chartOptions|safe }}');
 
+                    if (!chartOptions.plugins) {
+                        chartOptions.plugins = {};
+                    }
+                    chartOptions.plugins.legend = {
+                        display: false
+                    };
+
+                    // noinspection JSUnresolvedReference
                     new Chart(ctx, {
                         type: 'line',
                         data: chartData,
                         options: chartOptions
                     });
                 </script>
+
             {% endcomponent %}
         {% endcomponent %}
 
