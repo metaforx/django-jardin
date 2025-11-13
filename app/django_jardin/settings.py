@@ -13,6 +13,9 @@ import ast
 import os
 from pathlib import Path
 
+from django.urls import reverse_lazy
+from django.utils.translation import gettext_lazy as _
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -32,6 +35,7 @@ ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS", "localhost 127.0.0.1").sp
 # Application definition
 
 INSTALLED_APPS = [
+    "unfold", 
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -58,7 +62,9 @@ ROOT_URLCONF = "django_jardin.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        'DIRS': [
+             BASE_DIR / "jardin_data" / "templates",
+        ],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -144,3 +150,42 @@ CSRF_USE_SESSIONS = True
 CSRF_COOKIE_SAMESITE = 'Lax'
 
 CSRF_TRUSTED_ORIGINS = os.environ.get('CSRF_TRUSTED_ORIGINS', '').split()
+
+
+# Unfold
+UNFOLD = {
+    "SITE_TITLE": "dymax.io admin",
+    "SITE_HEADER": "dymax.io",
+    "SHOW_VIEW_ON_SITE": False,
+    "DASHBOARD_CALLBACK": "jardin_data.admin.dashboard_callback",
+    "SIDEBAR": {
+        "show_search": True,
+        "show_all_applications": True,
+        "navigation": [
+            {
+                "separator": False,
+                "collapsible": False,
+                "items": [
+                    {
+                        "title": _("Dashboard"),
+                        "icon": "dashboard",
+                        "link": reverse_lazy("admin:index"),
+                    },
+                ],
+            },
+            {
+                "title": _("Data"),
+                "separator": True,
+                "collapsible": False,
+                "items": [
+                    {
+                        "title": _("Sensor Data"),
+                        "icon": "sensors",
+                        "link": reverse_lazy("admin:jardin_data_sensordata_changelist"),
+                    },
+                ],
+            },
+        ],
+
+    }
+}
