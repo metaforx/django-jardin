@@ -1,4 +1,4 @@
-from typing import Tuple, Union, Literal
+from typing import Tuple, Literal
 
 import logging
 
