@@ -8,6 +8,8 @@ from django.views.generic import TemplateView
 from unfold.views import UnfoldModelAdminViewMixin
 from datetime import timedelta
 from django.utils import timezone
+from django.db.models import Avg
+from django.db.models.functions import TruncHour
 
 @register(SensorData)
 class SensorDataAdmin(ModelAdmin):
@@ -76,51 +78,45 @@ def dashboard_callback(request, context):
         # Use the extracted color or default to red
         sensor_color_map[sensor_id] = color_mapping.get(color_name, color_mapping['red'])
 
-    # Fetch all recent sensor data in one query instead of looping
-    from django.db.models import Max
-    
-    # Get the latest 10 entries for each sensor in a single optimized query
-    all_sensor_data = (
-        SensorData.objects
-        .filter(sensor_id__in=sensor_ids)
-        .order_by('sensor_id', '-created_at')
-    )
-    
-    # Group data by sensor_id
-    sensor_data_grouped = {}
-    for data in all_sensor_data:
-        if data.sensor_id not in sensor_data_grouped:
-            sensor_data_grouped[data.sensor_id] = []
-        if len(sensor_data_grouped[data.sensor_id]) < 10:
-            sensor_data_grouped[data.sensor_id].append(data)
+    chart_window_start = timezone.now() - timedelta(hours=24)
+    seven_days_ago = timezone.now() - timedelta(days=7)
 
-    # Get data for each sensor
+    # Bucket readings by hour for the last 24 hours to avoid pulling the full raw series
+    bucketed_data = (
+        SensorData.objects
+        .filter(sensor_id__in=sensor_ids, created_at__gte=chart_window_start)
+        .annotate(bucket=TruncHour("created_at"))
+        .values("sensor_id", "bucket")
+        .order_by("sensor_id", "bucket")
+        .annotate(avg_value=Avg("value"))
+    )
+
+    # Group bucketed data per sensor and collect all buckets
+    sensor_buckets = {}
+    bucket_set = set()
+    for entry in bucketed_data:
+        sensor_id = entry["sensor_id"]
+        bucket = entry["bucket"]
+        value = entry["avg_value"]
+        bucket_set.add(bucket)
+        sensor_buckets.setdefault(sensor_id, {})[bucket] = value
+
+    # Get data for each sensor aligned on buckets
     datasets = []
-    all_labels = []
     all_values = []
 
-    for idx, sensor_id in enumerate(sensor_ids):
-        # Get the data for this sensor
-        sensor_data = sensor_data_grouped.get(sensor_id, [])
-        
-        # Reverse to show oldest to newest
-        sensor_data = list(reversed(sensor_data))
+    sorted_buckets = sorted(bucket_set)
+    all_labels = [bucket.strftime('%Y-%m-%d %H:%M') for bucket in sorted_buckets]
 
-        if not sensor_data:
+    for sensor_id in sensor_ids:
+        sensor_bucket_values = sensor_buckets.get(sensor_id)
+        if not sensor_bucket_values:
             continue
 
-        # Extract values and timestamps
-        values = [entry.value for entry in sensor_data]
-        labels = [entry.created_at.strftime('%Y-%m-%d %H:%M') for entry in sensor_data]
+        # Maintain alignment across datasets; None keeps the slot empty
+        values = [sensor_bucket_values.get(bucket) for bucket in sorted_buckets]
+        all_values.extend(v for v in values if v is not None)
 
-        # Collect all values for min/max calculation
-        all_values.extend(values)
-
-        # Store labels from first sensor (they should all have similar timestamps)
-        if idx == 0:
-            all_labels = labels
-
-        # Add dataset for this sensor
         color = sensor_color_map[sensor_id]
         datasets.append({
             'label': sensor_id,
@@ -140,8 +136,6 @@ def dashboard_callback(request, context):
         max_temp = 30
 
     # Get lowest and highest temperatures from past 7 days in a single query each
-    seven_days_ago = timezone.now() - timedelta(days=7)
-    
     lowest_temp_reading = (
         SensorData.objects
         .filter(created_at__gte=seven_days_ago)
