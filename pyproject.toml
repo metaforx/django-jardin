@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Data Management for \"Le Jardin\""
 authors = ["Marc Widmer <marc@pbi.io>"]
 readme = "README.md"
+package-mode = false
 
 [tool.poetry.dependencies]
 python = "^3.12"
@@ -14,6 +15,7 @@ django-shinobi = "^1.4.0a0"
 ninja-api-key = "^1.0.2"
 requests = "^2.32.3"
 django-unfold = "^0.71.0"
+whitenoise = "^6.7.0"
 
 
 [build-system]

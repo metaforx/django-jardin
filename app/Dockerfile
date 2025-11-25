@@ -16,6 +16,9 @@ RUN poetry config virtualenvs.create false
 COPY pyproject.toml poetry.lock* ./
 RUN poetry install --no-interaction --no-ansi --no-root
 
+# prepare staticfiles directory for collectstatic during container startup
+RUN mkdir -p ${APP_HOME}/staticfiles
+
 # copy entrypoint.sh
 COPY app/entrypoint.sh .
 RUN sed -i 's/\r$//g' ${APP_HOME}/entrypoint.sh
