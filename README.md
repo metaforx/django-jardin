@@ -28,3 +28,33 @@ A django web application for managing and visualizing data from various sensors 
     ```
     docker compose -f docker-compose.prod.yml start nginx
     ```
+
+## Private Jellyfin Backbone (frp Tunnel)
+
+Not really related to this project, but useful to run on a VPS alongside it.
+
+Expose your home Jellyfin securely over a VPS without opening any home firewall ports.
+All traffic flows through an encrypted frp backbone tunnel.
+
+```
+Client (Phone / TV / Web)
+        │
+        ▼
+music.dymax.io  (HTTPS, VPS Nginx)
+        │
+        │  frp encrypted tunnel
+        ▼
+Volumio Jellyfin (LAN only, no external access)
+```
+
+``` bash
+# On your VPS (Digital Ocean Droplet)
+sudo systemctl start frps
+sudo systemctl stop frps
+sudo systemctl restart frps
+```
+
+### Configuration file path on VPS and Client
+``` bash
+/etc/frp/frps.toml
+```
